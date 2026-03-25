@@ -44,7 +44,16 @@ def get_all_breads():
     breads = cursor.fetchall()
 
     connection.close()
-    return breads
+    return [
+        {
+            "id": bread[0],
+            "date": bread[1],
+            "notes": bread[2],
+            "feedback": bread[3],
+            "image_url": f"uploads/{bread[4]}"
+        } 
+        for bread in breads
+    ]
 
 
 
