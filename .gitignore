@@ -27,3 +27,6 @@ Thumbs.db
 
 uploads/*
 !uploads/.gitkeep
+
+test_images/
+sourdough.db

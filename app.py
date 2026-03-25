@@ -7,6 +7,11 @@ if 'db_initialized' not in st.session_state:
     init_db()
     st.session_state.db_initialized = True
 
+if "claude" not in st.session_state:
+    st.session_state.claude = ClaudeService()
+
+claude = st.session_state.claude    
+
 st.set_page_config(
     page_title="Sourdough Journal",
     layout="wide"
@@ -32,16 +37,24 @@ if page == "New Bake":
 
     notes = st.text_area("Notes: ", height=150)
 
-    claude = ClaudeService()
-
     if st.button("Analyze", disabled=(photo is None)):
         with st.spinner("Claude is analyzing..."):
             with open(f"uploads/{photo.name}", "wb") as f:
                 f.write(photo.getvalue())
                 photo.seek(0)
-            result = claude.analyze_bread(photo, notes)
+                
+            result = ""
+
+            def stream_and_capture(generator):
+                global result
+                for chunk in generator:
+                    result += chunk
+                    yield chunk
+
+            stream = claude.analyze_bread(photo, notes)
+            st.write_stream(stream_and_capture(stream))
+
             save_bread(notes, result, photo.name)
-            st.write(result)
             st.success("Analysis complete!")
 
 elif page == "Past Breads":
