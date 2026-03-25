@@ -1,4 +1,6 @@
 import streamlit as st
+from claude_service import ClaudeService
+
 
 st.set_page_config(
     page_title="Sourdough Journal",
@@ -23,8 +25,12 @@ if page == "New Bake":
 
     notes = st.text_area("Notes: ", height=150)
 
+    claude = ClaudeService()
+
     if st.button("Analyze"):
         with st.spinner("Claude is analyzing..."):
+            result = claude.analyze_bread(photo, notes)
+            st.write(result)
             st.success("Analysis complete!")
 
 elif page == "Past Bakes":

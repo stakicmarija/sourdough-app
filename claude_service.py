@@ -14,37 +14,40 @@ class ClaudeService:
         self.messages = []
 
     def analyze_bread(self, image, notes):
-        image_bytes = base64.standard_b64encode(image.read()).decode('utf-8')
+        try:
+            image_bytes = base64.standard_b64encode(image.read()).decode('utf-8')
 
-        self.messages.append(
-            {
-
-                "role": "user",
-                "content":[{
-                    "type":"image",
-                    "source":{
-                        "type":"base64",
-                        "media_type":"image/jpeg",
-                        "data":image_bytes
-                    }
-                },
+            self.messages.append(
                 {
-                    "type":"text",
-                    "text":notes
+                    "role": "user",
+                    "content":[{
+                        "type":"image",
+                        "source":{
+                            "type":"base64",
+                            "media_type":"image/jpeg",
+                            "data":image_bytes
+                        }
+                    },
+                    {
+                        "type":"text",
+                        "text":notes
+                    }
+                    ]
                 }
-                ]
+            )
 
-            }
-            
-        )
+            message = self.client.messages.create(
+                model=model,
+                messages=self.messages,
+                max_tokens=2000
+            )
 
-        message = self.client.messages.create(
-            model=model,
-            messages=self.messages,
-            max_tokens=2000
-        )
+            return message.content[0].text
+        except Exception as e:
+            return f"Error: {str(e)}"
+        finally:
+            self.messages = []
 
-        return message.content[0].text
 
 
     
