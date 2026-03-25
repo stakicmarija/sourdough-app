@@ -4,84 +4,85 @@ import base64
 from dotenv import load_dotenv
 import time
 
-load_dotenv()   
+load_dotenv()
 
 model = "claude-sonnet-4-6"
+
+system_prompt = """
+You are a professional sourdough baker and mentor.
+
+Analyze photos of sourdough bread and give honest, constructive feedback to help the user improve.
+
+Focus on:
+- crumb structure
+- crust quality
+- oven spring and shape
+- fermentation (under/over proofing)
+
+Respond in this structure:
+1. Overall impression
+2. What is good
+3. What can be improved
+4. Specific actionable tips
+5. Optional score (1–10)
+
+Be supportive but direct. Avoid generic advice.
+Do not assume the image is not the user’s bread.
+"""
 
 class ClaudeService:
 
     def __init__(self):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.messages = []
 
-    def add_user_message(self, text):
-        user_message = { 'role': 'user', 'content': text}
-        self.messages.append(user_message)    
-
-    def add_assistant_message(self, content):
-        assistant_message = { 'role': 'assistant', 'content': content}
-        self.messages.append(assistant_message)
-
-    def chat(self, system=None):
-        print("CHAT CALLED")
+    def chat(self, messages, system=None):
         params = {
-            'model':model,
-            'max_tokens':1000,
-            'messages': self.messages,
+            "model": model,
+            "max_tokens": 1000,
+            "messages": messages,
         }
 
         if system:
-            params['system'] = system
+            params["system"] = system
 
-        full_text = ""
+        # retry
         for attempt in range(3):
+            full_text = ""
+
             try:
                 with self.client.messages.stream(**params) as stream:
                     for text in stream.text_stream:
                         full_text += text
-                        yield text  # stream ka UI
+                        yield text
 
-                    final_message = stream.get_final_message()
-                    print(f"FINAL {final_message.content[0].text}")
-
-                self.add_assistant_message(full_text)
-                break
+                return  # success, stop retry
 
             except Exception as e:
-                yield f"ERROR: {str(e)}"
-                print(f"ERROR: {str(e)}")
-                
+                error_str = str(e).lower()
+                yield f"\n Error: {str(e)}"
+                return
 
-        
     def analyze_bread(self, image, notes):
-        print("ANALYZE CALLED")
-        try:
-            image_bytes = base64.standard_b64encode(image.read()).decode('utf-8')
+        image_bytes = base64.standard_b64encode(image.read()).decode("utf-8")
 
-            content = [{
-                        "type":"image",
-                        "source":{
-                            "type":"base64",
-                            "media_type":"image/jpeg",
-                            "data":image_bytes
-                        }
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "source": {
+                            "type": "base64",
+                            "media_type": image.type, 
+                            "data": image_bytes,
+                        },
                     },
                     {
-                        "type":"text",
-                        "text":notes
-                    }
-                    ]
-            self.add_user_message(content)
-            return self.chat()    
-        except Exception as e:
-            return f"Error: {str(e)}"
+                        "type": "text",
+                        "text": notes,
+                    },
+                ],
+            }
+        ]
 
-    def chat_about_bread(self, message):
-        self.add_user_message(message)
-        return self.chat()    
-
-
-
-        
-
-    
+        return self.chat(messages, system_prompt)
