@@ -1,3 +1,5 @@
+import base64
+
 import streamlit as st
 from claude_service import ClaudeService
 from database import init_db, save_bread, get_all_breads
@@ -11,8 +13,13 @@ if 'db_initialized' not in st.session_state:
 # Claude instance
 if "claude" not in st.session_state:
     st.session_state.claude = ClaudeService()
-
 claude = st.session_state.claude
+
+# initialize chat history
+if "chat_messages" not in st.session_state:
+    st.session_state.chat_messages = []
+
+
 
 st.set_page_config(
     page_title="Sourdough Journal",
@@ -51,6 +58,28 @@ if page == "New Bake":
                 f.write(photo.getvalue())
                 photo.seek(0)
 
+            image_bytes = base64.standard_b64encode(photo.getvalue()).decode("utf-8")
+
+            st.session_state.chat_messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": photo.type, 
+                                "data": image_bytes,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": notes,
+                        },
+                    ],
+                }
+            ]
+
             result = ""
 
             def stream_and_capture(generator):
@@ -59,16 +88,38 @@ if page == "New Bake":
                     result += chunk
                     yield chunk
 
-            stream = claude.analyze_bread(photo, notes)
+            stream = claude.chat(st.session_state.chat_messages)
 
             st.write_stream(stream_and_capture(stream))
 
-            # sačuvaj u bazu
+            # save to db
             save_bread(notes, result, filename)
 
             st.success("Analysis complete!")
+            st.session_state.chat_messages.append({"role": "assistant", "content": result})
 
+    if len(st.session_state.chat_messages) >= 2:
+        st.header("Chat about your bread")
 
+        # display chat messages from history on app rerun
+        for i in range(2, len(st.session_state.chat_messages)):
+            with st.chat_message(st.session_state.chat_messages[i]["role"]):
+                st.markdown(st.session_state.chat_messages[i]["content"])
+
+        if prompt := st.chat_input("Ask something about your bread"):
+            st.session_state.chat_messages.append({"role": "user", "content": prompt})
+            with st.chat_message("user"):
+                st.markdown(prompt)
+            
+            with st.chat_message("assistant"):
+                stream = claude.chat(st.session_state.chat_messages)
+                message_placeholder = st.empty()
+                full_response = ""
+                for response in stream:
+                    full_response += response
+                    message_placeholder.markdown(full_response)
+                st.session_state.chat_messages.append({"role": "assistant", "content": full_response})
+           
 # =========================
 # PAST BREADS
 # =========================

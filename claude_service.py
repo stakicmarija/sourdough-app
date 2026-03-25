@@ -44,6 +44,8 @@ class ClaudeService:
 
         if system:
             params["system"] = system
+        else:
+            params["system"] = system_prompt
 
         # retry
         for attempt in range(3):
@@ -61,28 +63,3 @@ class ClaudeService:
                 error_str = str(e).lower()
                 yield f"\n Error: {str(e)}"
                 return
-
-    def analyze_bread(self, image, notes):
-        image_bytes = base64.standard_b64encode(image.read()).decode("utf-8")
-
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image",
-                        "source": {
-                            "type": "base64",
-                            "media_type": image.type, 
-                            "data": image_bytes,
-                        },
-                    },
-                    {
-                        "type": "text",
-                        "text": notes,
-                    },
-                ],
-            }
-        ]
-
-        return self.chat(messages, system_prompt)
